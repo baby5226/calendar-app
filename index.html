@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>網頁版行事曆</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1976d2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="行事曆">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #f5f5f5;
+        }
+
+        .calendar-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .calendar-nav button {
+            padding: 8px 16px;
+            border: none;
+            background: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .calendar-nav button:hover {
+            background: #0056b3;
+        }
+
+        .calendar-nav button.today-btn {
+            background: #28a745;
+        }
+
+        .calendar-nav button.today-btn:hover {
+            background: #218838;
+        }
+
+        .calendar-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 10px;
+        }
+
+        .view-toggle button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .view-toggle button.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .import-section {
+            margin-left: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .import-section input[type="file"] {
+            display: none;
+        }
+
+        .import-section label {
+            padding: 8px 16px;
+            background: #17a2b8;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .import-section label:hover {
+            background: #138496;
+        }
+
+        .monthly-calendar {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            background: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            width: 100%;
+            margin: 0 auto;
+            table-layout: fixed;
+        }
+
+        .calendar-day-header {
+            background: #f8f9fa;
+            padding: 15px 10px;
+            text-align: center;
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .calendar-day {
+            background: white;
+            height: 150px;
+            padding: 16px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .calendar-day:hover {
+            background: #f8f9fa;
+        }
+
+        .calendar-day.other-month {
+            background: #f8f9fa;
+            color: #ccc;
+        }
+
+        .calendar-day.today {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+        }
+
+        .day-number {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .todo-item {
+            background: #ffeb3b;
+            padding: 4px 8px;
+            margin: 2px 0;
+            border-radius: 3px;
+            font-size: 12px;
+            cursor: move;
+            border-left: 3px solid #ffc107;
+            transition: all 0.3s;
+            user-select: none;
+            position: relative;
+        }
+
+        .todo-item:hover {
+            background: #ffc107;
+            transform: translateY(-1px);
+        }
+
+        .todo-item.urgent {
+            background: #ff5722;
+            color: white;
+            border-left-color: #d32f2f;
+        }
+
+        .todo-item.completed {
+            background: #4caf50;
+            color: white;
+            border-left-color: #388e3c;
+            text-decoration: line-through;
+        }
+
+        .todo-item .delete-btn {
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(220, 53, 69, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            cursor: pointer;
+            display: none;
+            line-height: 1;
+        }
+
+        .todo-item:hover .delete-btn {
+            display: block;
+        }
+
+        .todo-count {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #ff5722;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .yearly-view {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .year-month {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .year-month:hover {
+            transform: scale(1.05);
+        }
+
+        .year-month.has-todos {
+            border: 2px solid #ff5722;
+        }
+
+        .year-month-title {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .year-month-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            font-size: 10px;
+        }
+
+        .year-month-day {
+            padding: 2px;
+            text-align: center;
+            background: #f8f9fa;
+            border-radius: 2px;
+        }
+
+        .year-month-day.has-todo {
+            background: #ff5722;
+            color: white;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 10px;
+            padding: 24px;
+            width: 900px;
+            max-width: 98vw;
+            max-height: 600px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .todo-list {
+            margin-bottom: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .todo-list-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            word-break: break-all;
+        }
+
+        .todo-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .todo-description {
+            color: #555;
+            font-size: 14px;
+            white-space: pre-line;
+        }
+
+        .dragging {
+            opacity: 0.5;
+        }
+
+        .drag-over {
+            background: #e3f2fd !important;
+        }
+
+        .save-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 1001;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .save-status.show {
+            opacity: 1;
+        }
+
+        .calendar-day.sat, .calendar-day.sun {
+            background: #ffe4ec !important;
+        }
+        .calendar-day-header.sat, .calendar-day-header.sun {
+            background: #ffd1e3 !important;
+        }
+        .search-bar {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .search-bar input[type="text"] {
+            padding: 6px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 15px;
+            width: 250px;
+        }
+
+        @media (max-width: 768px) {
+            .calendar-container {
+                padding: 10px;
+            }
+            
+            .calendar-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .import-section {
+                margin-left: 0;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .yearly-view {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+                padding: 10px;
+            }
+            
+            .calendar-day {
+                min-height: 100px;
+                padding: 8px;
+            }
+            
+            .todo-item {
+                font-size: 10px;
+                padding: 2px 4px;
+            }
+        }
+
+        .global-search-bar {
+            margin: 16px 0 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .global-search-input {
+            padding: 8px 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            width: 320px;
+        }
+
+        .global-search-result-list {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 16px;
+            padding: 12px 0;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .global-search-item {
+            padding: 10px 24px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        .global-search-item:last-child {
+            border-bottom: none;
+        }
+        .global-search-date {
+            font-weight: bold;
+            color: #007bff;
+            min-width: 110px;
+        }
+        .global-search-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .global-search-desc {
+            color: #555;
+            font-size: 14px;
+            white-space: pre-line;
+        }
+        .global-search-reminder {
+            color: #d63384;
+            font-size: 13px;
+        }
+        .global-search-goto {
+            margin-left: auto;
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .mini-month-grid {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 238px;
+            margin: 0 auto;
+        }
+        .mini-week-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            width: 224px;
+        }
+        .mini-week-cell, .mini-day-cell {
+            min-width: 28px;
+            max-width: 28px;
+            box-sizing: border-box;
+        }
+        .mini-week-cell {
+            text-align: center;
+            font-weight: bold;
+            color: #888;
+            padding: 2px 0 4px 0;
+            font-size: 13px;
+        }
+        .mini-day-cell {
+            text-align: center;
+            padding: 4px 0;
+            font-size: 15px;
+            border-radius: 5px;
+            margin: 1px 0;
+            background: #fff;
+            transition: background 0.2s;
+        }
+        .mini-day-cell.has-todo {
+            background: #ffe066;
+            font-weight: bold;
+            color: #b8860b;
+        }
+        .mini-sun {
+            background: #ffe4ec !important;
+            color: #d63384;
+        }
+        .mini-sat {
+            background: #e3f0ff !important;
+            color: #1976d2;
+        }
+    </style>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('service-worker.js');
+        });
+      }
+    </script>
+</head>
+<body>
+    <div class="calendar-container">
+        <div class="calendar-header">
+            <div class="calendar-nav">
+                <button onclick="previousMonth()">上個月</button>
+                <div class="calendar-title" id="calendarTitle">2025年1月</div>
+                <button onclick="nextMonth()">下個月</button>
+                <button class="today-btn" onclick="goToToday()">今天</button>
+            </div>
+            
+            <div class="view-toggle">
+                <button class="active" onclick="switchView('monthly')">月檢視</button>
+                <button onclick="switchView('yearly')">年檢視</button>
+            </div>
+
+            <div class="import-section">
+                <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" onchange="importExcel(event)">
+                <label for="excelFile">匯入Excel</label>
+                <button onclick="exportExcel()" style="padding: 8px 16px; background: #6f42c1; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background 0.3s;">匯出Excel</button>
+                <button onclick="downloadTemplate()" style="padding: 8px 16px; background: #fd7e14; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background 0.3s;">下載範本</button>
+            </div>
+        </div>
+        <div class="global-search-bar" style="margin: 16px 0 8px 0; display: flex; align-items: center; gap: 8px;">
+            <input type="text" id="globalSearchInput" placeholder="全站搜尋待辦事項..." style="padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; width: 320px;" oninput="renderGlobalSearchResult()">
+        </div>
+        <div id="globalSearchResult"></div>
+
+        <div id="calendarContent">
+            <!-- 日曆內容會在這裡動態生成 -->
+        </div>
+    </div>
+
+    <!-- 待辦事項編輯模態框 -->
+    <div id="todoModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">新增待辦事項</h2>
+                <button class="modal-close" onclick="closeTodoModal()">×</button>
+            </div>
+            
+            <form id="todoForm" onsubmit="saveTodo(event)">
+                <div class="form-group">
+                    <label for="todoTitle">標題 *</label>
+                    <input type="text" id="todoTitle" required placeholder="輸入待辦事項標題">
+                </div>
+
+                <div class="form-group">
+                    <label for="todoDescription">描述</label>
+                    <textarea id="todoDescription" placeholder="輸入待辦事項描述（選填）"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="todoReminder">提醒時間</label>
+                    <input type="datetime-local" id="todoReminder">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="todoUrgent">
+                        標記為緊急
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeTodoModal()">取消</button>
+                    <button type="submit" class="btn btn-primary" id="saveButton">新增</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 日期詳細資訊模態框 -->
+    <div id="dayModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="dayModalTitle">日期詳細資訊</h2>
+                <button class="modal-close" onclick="closeDayModal()">×</button>
+            </div>
+            
+            <div id="dayTodoList" class="todo-list">
+                <!-- 待辦事項列表會在這裡動態生成 -->
+            </div>
+            
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="openTodoModal()">新增待辦事項</button>
+                <button class="btn btn-secondary" onclick="closeDayModal()">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 儲存狀態提示 -->
+    <div id="saveStatus" class="save-status">已自動儲存</div>
+
+    <div id="customReminderModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2000;background:rgba(0,0,0,0.25);justify-content:center;align-items:center;">
+        <div id="customReminderContent" style="background:#fff;padding:36px 48px;border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,0.18);text-align:center;min-width:320px;max-width:90vw;position:relative;">
+            <div id="reminderUrgentTag" style="display:none;background:#d32f2f;color:#fff;font-weight:bold;padding:4px 16px;border-radius:12px;position:absolute;top:16px;right:16px;font-size:15px;">緊急</div>
+            <div id="reminderDate" style="font-size:20px;font-weight:bold;margin-bottom:12px;color:#1976d2;"></div>
+            <div id="reminderTitle" style="font-size:24px;font-weight:bold;margin-bottom:8px;color:#333;"></div>
+            <button onclick="closeCustomReminder()" style="margin-top:18px;padding:8px 32px;font-size:16px;background:#007bff;color:#fff;border:none;border-radius:6px;cursor:pointer;">關閉</button>
+        </div>
+    </div>
+
+    <script>
+        // 全域變數
+        let currentDate = new Date();
+        let currentView = 'monthly';
+        let todos = {};
+        let selectedDate = '';
+        let editingTodo = null;
+        let draggedTodo = null;
+        let hasUnsavedChanges = false;
+        let daySearchKeyword = '';
+        let yearlyViewYear = null;
+
+        // 星期名稱
+        const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+        const monthNames = [
+            '一月', '二月', '三月', '四月', '五月', '六月',
+            '七月', '八月', '九月', '十月', '十一月', '十二月'
+        ];
+
+        // 提醒佇列
+        let reminderQueue = [];
+        let isReminderShowing = false;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTodos();
+            renderCalendar();
+            requestNotificationPermission();
+            setupAutoSave();
+            setupBeforeUnload();
+        });
+
+        // 設定自動儲存
+        function setupAutoSave() {
+            // 每30秒自動儲存一次
+            setInterval(() => {
+                if (hasUnsavedChanges) {
+                    saveTodos();
+                    showSaveStatus();
+                    hasUnsavedChanges = false;
+                }
+            }, 30000);
+        }
+
+        // 設定頁面離開提醒
+        function setupBeforeUnload() {
+            window.addEventListener('beforeunload', function(e) {
+                if (hasUnsavedChanges) {
+                    e.preventDefault();
+                    e.returnValue = '您有未儲存的變更，確定要離開嗎？';
+                    return e.returnValue;
+                }
+            });
+        }
+
+        // 顯示儲存狀態
+        function showSaveStatus() {
+            const status = document.getElementById('saveStatus');
+            status.classList.add('show');
+            setTimeout(() => {
+                status.classList.remove('show');
+            }, 2000);
+        }
+
+        // 載入待辦事項
+        function loadTodos() {
+            const saved = localStorage.getItem('calendar-todos');
+            if (saved) {
+                try {
+                    todos = JSON.parse(saved);
+                } catch (error) {
+                    console.error('載入待辦事項失敗:', error);
+                    todos = {};
+                }
+            }
+        }
+
+        // 儲存待辦事項
+        function saveTodos() {
+            localStorage.setItem('calendar-todos', JSON.stringify(todos));
+            hasUnsavedChanges = false;
+        }
+
+        // 格式化日期
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // 格式化月份顯示
+        function formatMonthDisplay(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            return `${year}年${month}月`;
+        }
+
+        // 取得月份天數
+        function getMonthDays(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const days = [];
+
+            // 取得前一個月的天數
+            const firstDayOfWeek = firstDay.getDay();
+            for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                const prevDate = new Date(year, month, -i);
+                days.push({ date: prevDate, isCurrentMonth: false });
+            }
+
+            // 取得當月天數
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                const currentDate = new Date(year, month, day);
+                days.push({ date: currentDate, isCurrentMonth: true });
+            }
+
+            // 取得下一個月的天數
+            const lastDayOfWeek = lastDay.getDay();
+            for (let i = 1; i <= 6 - lastDayOfWeek; i++) {
+                const nextDate = new Date(year, month + 1, i);
+                days.push({ date: nextDate, isCurrentMonth: false });
+            }
+
+            return days;
+        }
+
+        // 檢查是否為今天
+        function isToday(date) {
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        }
+
+        // 取得日期的待辦事項
+        function getTodosForDate(dateStr) {
+            return todos[dateStr] || [];
+        }
+
+        // 渲染日曆
+        function renderCalendar() {
+            const title = document.getElementById('calendarTitle');
+            title.textContent = formatMonthDisplay(currentDate);
+
+            const content = document.getElementById('calendarContent');
+
+            if (currentView === 'monthly') {
+                content.innerHTML = renderMonthlyView();
+            } else {
+                content.innerHTML = renderYearlyView();
+            }
+        }
+
+        // 渲染月檢視
+        function renderMonthlyView() {
+            const days = getMonthDays(currentDate);
+            let html = '<div class="monthly-calendar"><div class="calendar-grid">';
+
+            // 星期標題
+            weekDays.forEach((day, idx) => {
+                const extraClass = idx === 0 ? 'sun' : (idx === 6 ? 'sat' : '');
+                html += `<div class="calendar-day-header ${extraClass}">${day}</div>`;
+            });
+
+            // 日期格子
+            days.forEach(({ date, isCurrentMonth }) => {
+                const dateStr = formatDate(date);
+                const dayTodos = (getTodosForDate(dateStr) || []).filter(todo => todo.title || todo.reminderTime);
+                const isTodayClass = isToday(date) ? 'today' : '';
+                const otherMonthClass = !isCurrentMonth ? 'other-month' : '';
+                const dayOfWeek = date.getDay();
+                const weekendClass = dayOfWeek === 0 ? 'sun' : (dayOfWeek === 6 ? 'sat' : '');
+
+                html += `
+                    <div class="calendar-day ${otherMonthClass} ${isTodayClass} ${weekendClass}" 
+                         onclick="openDayModal('${dateStr}')" 
+                         ondragover="handleDragOver(event)" 
+                         ondrop="handleDrop(event, '${dateStr}')">
+                        <div class="day-number">${date.getDate()}</div>
+                        ${dayTodos.length > 0 ? `<div class="todo-count">${dayTodos.length}</div>` : ''}
+                        ${dayTodos.slice(0, 3).map(todo => `
+                            <div class="todo-item ${todo.isUrgent ? 'urgent' : ''} ${todo.isCompleted ? 'completed' : ''}"
+                                 draggable="true"
+                                 ondragstart="handleDragStart(event, '${todo.id}')"
+                                 onclick="event.stopPropagation(); editTodo('${todo.id}')">
+                                ${todo.title}
+                                <button class="delete-btn" onclick="event.stopPropagation(); deleteTodo('${todo.id}')" title="刪除">×</button>
+                            </div>
+                        `).join('')}
+                        ${dayTodos.length > 3 ? `<div class="todo-item">+${dayTodos.length - 3} 更多</div>` : ''}
+                    </div>
+                `;
+            });
+
+            html += '</div></div>';
+            return html;
+        }
+
+        // 渲染年檢視
+        function renderYearlyView() {
+            let html = '';
+            const currentYear = yearlyViewYear !== null ? yearlyViewYear : currentDate.getFullYear();
+            yearlyViewYear = currentYear;
+            html += `<div style="display:flex;align-items:center;justify-content:center;margin-bottom:16px;gap:16px;">
+                        <button onclick="switchYear(-1)" style="padding:6px 18px;font-size:18px;">← 上一年</button>
+                        <span style="font-size:22px;font-weight:bold;">${currentYear} 年</span>
+                        <button onclick="switchYear(1)" style="padding:6px 18px;font-size:18px;">下一年 →</button>
+                    </div>`;
+            html += '<div class="yearly-view">';
+            monthNames.forEach((monthName, monthIndex) => {
+                const month = monthIndex + 1;
+                const hasTodos = hasTodosInMonth(currentYear, month);
+                html += `
+                    <div class="year-month ${hasTodos ? 'has-todos' : ''}" 
+                         onclick="goToMonth(${currentYear}, ${month})">
+                        <div class="year-month-title">${monthName}</div>
+                        <div class="year-month-grid">
+                            ${renderMonthGrid(currentYear, month)}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        // 渲染月份格子（年檢視）
+        function renderMonthGrid(year, month) {
+            let html = '<div class="mini-month-grid">';
+            // 星期標題
+            html += '<div class="mini-week-row">';
+            ['日','一','二','三','四','五','六'].forEach((w,idx)=>{
+                const cls = idx===0?'mini-sun':(idx===6?'mini-sat':'');
+                html += `<div class="mini-week-cell ${cls}">${w}</div>`;
+            });
+            html += '</div>';
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const daysWithTodos = getMonthDaysWithTodos(year, month);
+            // 計算1號是星期幾
+            const firstDay = new Date(year, month - 1, 1);
+            const firstDayOfWeek = firstDay.getDay();
+            let day = 1;
+            let started = false;
+            while (day <= daysInMonth) {
+                html += '<div class="mini-week-row">';
+                for (let col = 0; col < 7; col++) {
+                    if (!started && col < firstDayOfWeek) {
+                        html += '<div class="mini-day-cell"></div>';
+                    } else if (day <= daysInMonth) {
+                        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const hasTodo = daysWithTodos.includes(dateStr);
+                        const cls = (col===0?'mini-sun ' : col===6?'mini-sat ':'') + (hasTodo?'has-todo':'');
+                        html += `<div class="mini-day-cell ${cls}">${day}</div>`;
+                        day++;
+                        started = true;
+                    } else {
+                        html += '<div class="mini-day-cell"></div>';
+                    }
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        // 檢查月份是否有待辦事項
+        function hasTodosInMonth(year, month) {
+            const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+            return Object.keys(todos).some(date => date.startsWith(monthStr) && todos[date] && todos[date].length > 0);
+        }
+
+        // 取得月份中有待辦事項的日期
+        function getMonthDaysWithTodos(year, month) {
+            const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+            return Object.keys(todos).filter(date => date.startsWith(monthStr) && todos[date] && todos[date].length > 0);
+        }
+
+        // 切換檢視
+        function switchView(view) {
+            currentView = view;
+            document.querySelectorAll('.view-toggle button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            if(view === 'yearly') yearlyViewYear = currentDate.getFullYear();
+            renderCalendar();
+        }
+
+        // 上個月
+        function previousMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        }
+
+        // 下個月
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        }
+
+        // 前往指定月份
+        function goToMonth(year, month) {
+            currentDate = new Date(year, month - 1, 1);
+            currentView = 'monthly';
+            document.querySelectorAll('.view-toggle button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector('.view-toggle button:first-child').classList.add('active');
+            renderCalendar();
+        }
+
+        // 跳到今天
+        function goToToday() {
+            currentDate = new Date();
+            currentView = 'monthly';
+            document.querySelectorAll('.view-toggle button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector('.view-toggle button:first-child').classList.add('active');
+            renderCalendar();
+        }
+
+        // 開啟待辦事項模態框
+        function openTodoModal() {
+            selectedDate = selectedDate || formatDate(currentDate);
+            document.getElementById('modalTitle').textContent = '新增待辦事項';
+            document.getElementById('saveButton').textContent = '新增';
+            document.getElementById('todoForm').reset();
+            editingTodo = null;
+            document.getElementById('todoModal').style.display = 'flex';
+            // 關閉日期詳細模態框
+            document.getElementById('dayModal').style.display = 'none';
+        }
+
+        // 關閉待辦事項模態框
+        function closeTodoModal() {
+            document.getElementById('todoModal').style.display = 'none';
+            editingTodo = null;
+        }
+
+        // 儲存待辦事項
+        function saveTodo(event) {
+            event.preventDefault();
+            
+            const title = document.getElementById('todoTitle').value.trim();
+            const description = document.getElementById('todoDescription').value.trim();
+            const reminderTime = document.getElementById('todoReminder').value;
+            const isUrgent = document.getElementById('todoUrgent').checked;
+
+            if (!title) {
+                alert('請輸入待辦事項標題');
+                return;
+            }
+
+            const todo = {
+                id: editingTodo ? editingTodo.id : Date.now().toString(),
+                title: title,
+                description: description,
+                date: selectedDate,
+                reminderTime: reminderTime || null,
+                isCompleted: editingTodo ? editingTodo.isCompleted : false,
+                isUrgent: isUrgent,
+                createdAt: editingTodo ? editingTodo.createdAt : new Date().toISOString()
+            };
+
+            if (!todos[selectedDate]) {
+                todos[selectedDate] = [];
+            }
+
+            if (editingTodo) {
+                // 更新現有待辦事項
+                const index = todos[selectedDate].findIndex(t => t.id === editingTodo.id);
+                if (index !== -1) {
+                    todos[selectedDate][index] = todo;
+                }
+            } else {
+                // 新增待辦事項
+                todos[selectedDate].push(todo);
+            }
+
+            hasUnsavedChanges = true;
+            saveTodos();
+            closeTodoModal();
+            renderCalendar();
+            
+            // 如果是在日期詳細視窗中新增的，重新開啟日期詳細視窗
+            if (document.getElementById('dayModal').style.display === 'none') {
+                openDayModal(selectedDate);
+            } else {
+                renderDayModal();
+            }
+        }
+
+        // 編輯待辦事項
+        function editTodo(todoId) {
+            const todo = findTodoById(todoId);
+            if (todo) {
+                editingTodo = todo;
+                selectedDate = todo.date;
+                document.getElementById('modalTitle').textContent = '編輯待辦事項';
+                document.getElementById('saveButton').textContent = '更新';
+                document.getElementById('todoTitle').value = todo.title;
+                document.getElementById('todoDescription').value = todo.description || '';
+                document.getElementById('todoReminder').value = todo.reminderTime || '';
+                document.getElementById('todoUrgent').checked = todo.isUrgent;
+                document.getElementById('todoModal').style.display = 'flex';
+                // 修正：編輯時自動關閉日期詳細視窗
+                document.getElementById('dayModal').style.display = 'none';
+            }
+        }
+
+        // 根據 ID 尋找待辦事項
+        function findTodoById(todoId) {
+            for (const date in todos) {
+                const todo = todos[date].find(t => t.id === todoId);
+                if (todo) return todo;
+            }
+            return null;
+        }
+
+        // 刪除待辦事項
+        function deleteTodo(todoId) {
+            if (confirm('確定要刪除這個待辦事項嗎？')) {
+                for (const date in todos) {
+                    todos[date] = todos[date].filter(t => t.id !== todoId);
+                    // 如果該日期沒有待辦事項了，刪除該日期的空陣列
+                    if (todos[date].length === 0) {
+                        delete todos[date];
+                    }
+                }
+                hasUnsavedChanges = true;
+                saveTodos();
+                renderCalendar();
+                renderDayModal();
+                showSaveStatus();
+            }
+        }
+
+        // 切換完成狀態
+        function toggleComplete(todoId) {
+            for (const date in todos) {
+                const todo = todos[date].find(t => t.id === todoId);
+                if (todo) {
+                    todo.isCompleted = !todo.isCompleted;
+                    break;
+                }
+            }
+            hasUnsavedChanges = true;
+            saveTodos();
+            renderCalendar();
+            renderDayModal();
+            showSaveStatus();
+        }
+
+        // 開啟日期詳細資訊模態框
+        function openDayModal(date) {
+            selectedDate = date;
+            document.getElementById('dayModalTitle').textContent = formatDateDisplay(new Date(date));
+            renderDayModal();
+            document.getElementById('dayModal').style.display = 'flex';
+        }
+
+        // 關閉日期詳細資訊模態框
+        function closeDayModal() {
+            document.getElementById('dayModal').style.display = 'none';
+        }
+
+        // 渲染日期詳細資訊
+        function renderDayModal() {
+            const dayTodos = getTodosForDate(selectedDate);
+            const container = document.getElementById('dayTodoList');
+            // 搜尋過濾
+            let filteredTodos = dayTodos;
+            if (daySearchKeyword) {
+                const kw = daySearchKeyword.trim().toLowerCase();
+                filteredTodos = dayTodos.filter(todo =>
+                    (todo.title && todo.title.toLowerCase().includes(kw)) ||
+                    (todo.description && todo.description.toLowerCase().includes(kw)) ||
+                    (todo.reminderTime && todo.reminderTime.toLowerCase().includes(kw))
+                );
+            }
+            let html = '';
+            // 搜尋框一定在最上方
+            html += `<div class="search-bar">
+                        <input type="text" placeholder="搜尋待辦事項..." value="${daySearchKeyword}" oninput="daySearchKeyword=this.value;renderDayModal();">
+                    </div>`;
+            if (filteredTodos.length === 0) {
+                html += '<p>這一天沒有待辦事項</p>';
+            } else {
+                filteredTodos.forEach(todo => {
+                    html += `
+                        <div class="todo-list-item ${todo.isUrgent ? 'urgent' : ''} ${todo.isCompleted ? 'completed' : ''}">
+                            <div class="todo-info">
+                                <div class="todo-title">${todo.title}</div>
+                                ${todo.description ? `<div class="todo-description">${todo.description}</div>` : ''}
+                                ${todo.reminderTime ? `<div class="todo-reminder">提醒時間: ${new Date(todo.reminderTime).toLocaleString('zh-TW')}</div>` : ''}
+                            </div>
+                            <div class="todo-actions">
+                                <button onclick="toggleComplete('${todo.id}')" class="btn btn-secondary">
+                                    ${todo.isCompleted ? '取消完成' : '標記完成'}
+                                </button>
+                                <button onclick="editTodo('${todo.id}')" class="btn btn-primary">編輯</button>
+                                <button onclick="deleteTodo('${todo.id}')" class="btn btn-danger">刪除</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        // 格式化日期顯示
+        function formatDateDisplay(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            return `${year}年${month}月${day}日`;
+        }
+
+        // 拖曳功能
+        function handleDragStart(event, todoId) {
+            draggedTodo = todoId;
+            event.target.classList.add('dragging');
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDrop(event, targetDate) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+            
+            if (draggedTodo) {
+                const todo = findTodoById(draggedTodo);
+                if (todo && todo.date !== targetDate) {
+                    // 從原日期移除
+                    todos[todo.date] = todos[todo.date].filter(t => t.id !== draggedTodo);
+                    // 如果原日期沒有待辦事項了，刪除該日期的空陣列
+                    if (todos[todo.date].length === 0) {
+                        delete todos[todo.date];
+                    }
+                    
+                    // 添加到新日期
+                    if (!todos[targetDate]) {
+                        todos[targetDate] = [];
+                    }
+                    todo.date = targetDate;
+                    todos[targetDate].push(todo);
+                    
+                    hasUnsavedChanges = true;
+                    saveTodos();
+                    renderCalendar();
+                    showSaveStatus();
+                }
+                draggedTodo = null;
+            }
+        }
+
+        // 請求通知權限
+        function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+
+        // 檢查提醒
+        function checkReminders() {
+            const now = new Date();
+            const toRemind = [];
+            Object.values(todos).flat().forEach(todo => {
+                if (todo.reminderTime && !todo.isCompleted) {
+                    const reminderTime = new Date(todo.reminderTime);
+                    if (reminderTime <= now && reminderTime > new Date(now.getTime() - 60000)) {
+                        toRemind.push({
+                            title: todo.title,
+                            reminderTime: todo.reminderTime,
+                            isUrgent: todo.isUrgent
+                        });
+                    }
+                }
+            });
+            // 若已有提醒在顯示，將新提醒加入佇列
+            if (isReminderShowing) {
+                reminderQueue.push(...toRemind);
+            } else if (toRemind.length > 0) {
+                showCustomReminder(toRemind.shift());
+                reminderQueue.push(...toRemind);
+            }
+        }
+
+        // 每30秒檢查一次提醒
+        setInterval(checkReminders, 30000);
+
+        // 驗證日期格式，並自動轉換常見格式
+        function isValidDate(dateStr) {
+            if (!dateStr) return false;
+            dateStr = String(dateStr).trim();
+            // 支援 YYYYMMDD
+            if (/^\d{8}$/.test(dateStr)) {
+                const y = dateStr.slice(0,4);
+                const m = dateStr.slice(4,6);
+                const d = dateStr.slice(6,8);
+                dateStr = `${y}-${m}-${d}`;
+            }
+            // 支援 YYYY/MM/DD 轉 YYYY-MM-DD
+            if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(dateStr)) {
+                dateStr = dateStr.replace(/\//g, '-');
+            }
+            const date = new Date(dateStr);
+            return date instanceof Date && !isNaN(date);
+        }
+
+        // 匯入待辦事項時自動轉換日期格式
+        function importTodos(importedTodos) {
+            importedTodos.forEach(todo => {
+                let dateStr = String(todo.date).trim();
+                // 過濾空白日期
+                if (!dateStr) return;
+                // 自動轉換YYYYMMDD等格式
+                if (/^\d{8}$/.test(dateStr)) {
+                    const y = dateStr.slice(0,4);
+                    const m = dateStr.slice(4,6);
+                    const d = dateStr.slice(6,8);
+                    dateStr = `${y}-${m}-${d}`;
+                }
+                if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(dateStr)) {
+                    dateStr = dateStr.replace(/\//g, '-');
+                }
+                dateStr = formatDate(new Date(dateStr));
+                if (!todos[dateStr]) {
+                    todos[dateStr] = [];
+                }
+                // 過濾完全空白的待辦
+                if (!todo.title && !todo.reminderTime) return;
+                const newTodo = {
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                    title: todo.title,
+                    description: todo.description,
+                    date: dateStr,
+                    reminderTime: todo.reminderTime || null,
+                    isCompleted: todo.isCompleted,
+                    isUrgent: todo.isUrgent,
+                    createdAt: new Date().toISOString()
+                };
+                todos[dateStr].push(newTodo);
+            });
+            hasUnsavedChanges = true;
+            saveTodos();
+            renderCalendar();
+            showSaveStatus();
+        }
+
+        // 匯出Excel
+        function exportExcel() {
+            // 匯出前自動清理 todos，只保留有內容的待辦，並移除空日期
+            const cleanedTodos = {};
+            for (const date in todos) {
+                const validTodos = (todos[date] || []).filter(todo => todo.title || todo.reminderTime);
+                if (validTodos.length > 0) {
+                    cleanedTodos[date] = validTodos;
+                }
+            }
+            // 更新 todos 與 localStorage
+            todos = cleanedTodos;
+            saveTodos();
+
+            const allTodos = [];
+            for (const date in todos) {
+                todos[date].forEach(todo => {
+                    allTodos.push([
+                        todo.title,
+                        todo.description || '',
+                        todo.date,
+                        todo.reminderTime || '',
+                        todo.isUrgent ? '是' : '否',
+                        todo.isCompleted ? '是' : '否',
+                        todo.createdAt
+                    ]);
+                });
+            }
+            if (allTodos.length === 0) {
+                alert('沒有待辦事項可以匯出');
+                return;
+            }
+            const ws = XLSX.utils.aoa_to_sheet([
+                ['標題', '描述', '日期', '提醒時間', '緊急', '已完成', '建立時間'],
+                ...allTodos
+            ]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '待辦事項');
+            const fileName = `待辦事項_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            alert(`成功匯出 ${allTodos.length} 個待辦事項`);
+        }
+
+        // 匯入Excel檔案
+        function importExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = e.target.result;
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    if (jsonData.length < 2) {
+                        alert('Excel檔案格式錯誤，請確保有標題行和至少一行資料');
+                        return;
+                    }
+
+                    // 跳過標題行，從第二行開始處理
+                    const todos = [];
+                    const errors = [];
+                    
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        let title = row[0] || '';
+                        let description = row[1] || '';
+                        let date = row[2] || '';
+                        let time = row[3] || '';
+                        let period = row[4] || '';
+                        // 若只有三欄，視為無提醒時間
+                        if (row.length === 3) {
+                            time = '';
+                            period = '';
+                        }
+                        // 若只有四欄，視為無時段
+                        if (row.length === 4) {
+                            period = '';
+                        }
+                        // 組合提醒時間
+                        let reminderTime = '';
+                        if (date && time) {
+                            let dateStr = String(date).trim();
+                            if (/^\d{8}$/.test(dateStr)) {
+                                const y = dateStr.slice(0,4);
+                                const m = dateStr.slice(4,6);
+                                const d = dateStr.slice(6,8);
+                                dateStr = `${y}-${m}-${d}`;
+                            }
+                            if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(dateStr)) {
+                                dateStr = dateStr.replace(/\//g, '-');
+                            }
+                            let [hh, mm] = time.split(':');
+                            if (period === '下午' && hh) {
+                                hh = String((parseInt(hh, 10) + 12) % 24).padStart(2, '0');
+                            }
+                            if (hh && mm) {
+                                reminderTime = `${dateStr}T${hh}:${mm}:00`;
+                            }
+                        }
+                        // 驗證日期
+                        if (!date || !isValidDate(date)) {
+                            errors.push(`第${i+1}行：日期格式錯誤 (${date})`);
+                            continue;
+                        }
+                        todos.push({
+                            title,
+                            description,
+                            date,
+                            reminderTime,
+                            isUrgent: false,
+                            isCompleted: false
+                        });
+                    }
+
+                    if (errors.length > 0) {
+                        alert('匯入過程中發現以下錯誤：\n' + errors.join('\n'));
+                        return;
+                    }
+
+                    if (todos.length > 0) {
+                        if (confirm(`即將匯入 ${todos.length} 個待辦事項，是否繼續？`)) {
+                            importTodos(todos);
+                            alert(`成功匯入 ${todos.length} 個待辦事項！`);
+                        }
+                    } else {
+                        alert('沒有找到有效的待辦事項資料，請檢查Excel檔案格式');
+                    }
+                } catch (error) {
+                    console.error('匯入Excel失敗:', error);
+                    alert('匯入Excel失敗，請檢查檔案格式是否正確。\n\n建議：\n1. 使用「下載範本」功能取得正確格式\n2. 確保檔案為.xlsx或.xls格式\n3. 檢查檔案是否損壞');
+                }
+            };
+            reader.readAsBinaryString(file);
+            event.target.value = '';
+        }
+
+        // 下載範本
+        function downloadTemplate() {
+            // 表頭加上說明
+            const templateData = [
+                [
+                    '標題',
+                    '描述',
+                    '日期',
+                    '提醒時間(HH:MM)',
+                    '時段(上午/下午)',
+                    '緊急',
+                    '已完成',
+                    '建立時間'
+                ],
+                [
+                    '（待辦事項標題，可空白）',
+                    '（待辦事項描述，可空白）',
+                    '（必填，20250626、2025/06/26、2025-06-26）',
+                    '（可空白，24小時制，如09:00、15:30）',
+                    '（可空白，上午/下午，下午自動加12小時）',
+                    '（可空白，Y/是為緊急）',
+                    '（可空白，Y/是為已完成）',
+                    '（可空白，系統自動產生）'
+                ],
+                [
+                    '測試',
+                    '請刪除後在匯入',
+                    '20250626',
+                    '09:00',
+                    '上午',
+                    'Y',
+                    '',
+                    ''
+                ]
+            ];
+            
+            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '待辦事項範本');
+            
+            XLSX.writeFile(wb, '待辦事項匯入範本.xlsx');
+        }
+
+        function renderGlobalSearchResult() {
+            const kw = document.getElementById('globalSearchInput').value.trim().toLowerCase();
+            const resultDiv = document.getElementById('globalSearchResult');
+            if (!kw) {
+                resultDiv.innerHTML = '';
+                return;
+            }
+            let results = [];
+            for (const date in todos) {
+                (todos[date] || []).forEach(todo => {
+                    if (
+                        (todo.title && todo.title.toLowerCase().includes(kw)) ||
+                        (todo.description && todo.description.toLowerCase().includes(kw)) ||
+                        (todo.reminderTime && todo.reminderTime.toLowerCase().includes(kw))
+                    ) {
+                        results.push({ ...todo, date });
+                    }
+                });
+            }
+            if (results.length === 0) {
+                resultDiv.innerHTML = '<div class="global-search-result-list"><div style="padding:16px; color:#888;">查無相關待辦事項</div></div>';
+                return;
+            }
+            let html = '<div class="global-search-result-list">';
+            results.forEach(item => {
+                html += `<div class="global-search-item">
+                    <div class="global-search-date">${item.date}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="global-search-title">${item.title || '(無標題)'}</div>
+                        ${item.description ? `<div class="global-search-desc">${item.description}</div>` : ''}
+                        ${item.reminderTime ? `<div class="global-search-reminder">提醒：${new Date(item.reminderTime).toLocaleString('zh-TW')}</div>` : ''}
+                    </div>
+                    <button class="global-search-goto" onclick="goToDateAndOpen('${item.date}')">前往日曆</button>
+                </div>`;
+            });
+            html += '</div>';
+            resultDiv.innerHTML = html;
+        }
+
+        function goToDateAndOpen(dateStr) {
+            currentDate = new Date(dateStr);
+            currentView = 'monthly';
+            renderCalendar();
+            setTimeout(() => openDayModal(dateStr), 100);
+        }
+
+        // 年檢視切換年份UI與邏輯
+        function switchYear(offset) {
+            yearlyViewYear = (yearlyViewYear || currentDate.getFullYear()) + offset;
+            renderCalendar();
+        }
+
+        function showCustomReminder({title, reminderTime, isUrgent}) {
+            // 若已有提醒在顯示，加入佇列
+            if (isReminderShowing) {
+                reminderQueue.push({title, reminderTime, isUrgent});
+                return;
+            }
+            isReminderShowing = true;
+            document.getElementById('reminderTitle').textContent = title || '(無標題)';
+            document.getElementById('reminderDate').textContent = reminderTime ? new Date(reminderTime).toLocaleString('zh-TW') : '';
+            document.getElementById('reminderUrgentTag').style.display = isUrgent ? 'block' : 'none';
+            document.getElementById('customReminderModal').style.display = 'flex';
+        }
+        function closeCustomReminder() {
+            document.getElementById('customReminderModal').style.display = 'none';
+            isReminderShowing = false;
+            // 若佇列還有提醒，繼續顯示下一個
+            if (reminderQueue.length > 0) {
+                const next = reminderQueue.shift();
+                setTimeout(()=>showCustomReminder(next), 200);
+            }
+        }
+    </script>
+</body>
+</html> 

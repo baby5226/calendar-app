@@ -1,0 +1,21 @@
+{
+  "name": "行事曆",
+  "short_name": "行事曆",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1976d2",
+  "theme_color": "#1976d2",
+  "description": "簡易PWA行事曆，支援待辦、提醒、月/年檢視、Excel匯入匯出等功能。",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+} 
