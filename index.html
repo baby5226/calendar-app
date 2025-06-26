@@ -11,6 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="行事曆">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
     <style>
         * {
             margin: 0;
@@ -1325,15 +1326,15 @@
                     }
                 }
             });
-            // 若已有提醒在顯示，將新提醒加入佇列
+            // 只呼叫一次 showCustomReminder，其他進 queue
             if (isReminderShowing) {
                 reminderQueue.push(...toRemind);
             } else if (toRemind.length > 0) {
-                // 不論分頁可見與否，兩種通知都要有
                 showCustomReminder(toRemind[0]);
-                toRemind.forEach(reminder => showNotification(reminder));
                 if (toRemind.length > 1) reminderQueue.push(...toRemind.slice(1));
             }
+            // Notification API 全部都要
+            toRemind.forEach(reminder => showNotification(reminder));
         }
 
         // 每30秒檢查一次提醒
