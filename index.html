@@ -1329,8 +1329,10 @@
             if (isReminderShowing) {
                 reminderQueue.push(...toRemind);
             } else if (toRemind.length > 0) {
-                showCustomReminder(toRemind.shift());
-                reminderQueue.push(...toRemind);
+                // 不論分頁可見與否，兩種通知都要有
+                showCustomReminder(toRemind[0]);
+                toRemind.forEach(reminder => showNotification(reminder));
+                if (toRemind.length > 1) reminderQueue.push(...toRemind.slice(1));
             }
         }
 
@@ -1650,6 +1652,17 @@
             if (reminderQueue.length > 0) {
                 const next = reminderQueue.shift();
                 setTimeout(()=>showCustomReminder(next), 200);
+            }
+        }
+
+        // 新增：桌面通知
+        function showNotification({title, reminderTime, isUrgent}) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const body = (reminderTime ? new Date(reminderTime).toLocaleString('zh-TW') + '\n' : '') + (isUrgent ? '[緊急]\n' : '');
+                new Notification(title || '待辦事項提醒', {
+                    body: body,
+                    icon: isUrgent ? 'icon-192.png' : undefined
+                });
             }
         }
     </script>
