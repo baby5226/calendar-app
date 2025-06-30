@@ -1671,6 +1671,29 @@
                 });
             }
         }
+
+        function scheduleMidnightUpdate(updateFunc) {
+            // 計算距離下個午夜的毫秒數
+            const now = new Date();
+            const nextMidnight = new Date(now);
+            nextMidnight.setHours(24, 0, 0, 0); // 明天的 00:00:00
+            const msToMidnight = nextMidnight - now;
+
+            // 設定一次性計時器
+            setTimeout(() => {
+                updateFunc(); // 執行更新
+                // 之後每天 24 小時執行一次
+                setInterval(updateFunc, 24 * 60 * 60 * 1000);
+            }, msToMidnight);
+        }
+
+        // 用法：傳入你要午夜時執行的函數
+        scheduleMidnightUpdate(() => {
+            // 這裡放你的更新邏輯，例如：
+            refreshCalendar();
+            highlightToday();
+            // ...其他每日重置
+        });
     </script>
 </body>
 </html> 
