@@ -680,7 +680,7 @@
                 <button class="modal-close" onclick="closeTodoModal()">×</button>
             </div>
             
-            <div id="selectedDateDisplay" style="margin-bottom: 10px; font-weight: bold; color: #1976d2;"></div>
+            <div id="selectedDateDisplay" style="margin-bottom: 10px; font-weight: bold; color: #1976d2; font-size: 18px;"></div>
             <form id="todoForm" onsubmit="saveTodo(event)">
                 <div class="form-group">
                     <label for="todoTitle">標題 *</label>
@@ -1066,6 +1066,21 @@
             renderCalendar();
         }
 
+        // 顯示目前選取日期（新增/編輯待辦事項時）
+        function updateSelectedDateDisplay() {
+            if (!selectedDate) {
+                document.getElementById('selectedDateDisplay').textContent = '';
+                return;
+            }
+            const dateObj = new Date(selectedDate);
+            if (isNaN(dateObj)) {
+                document.getElementById('selectedDateDisplay').textContent = '';
+                return;
+            }
+            const weekDay = '日一二三四五六'.charAt(dateObj.getDay());
+            document.getElementById('selectedDateDisplay').textContent = `日期：${dateObj.getFullYear()}年${dateObj.getMonth()+1}月${dateObj.getDate()}日（星期${weekDay}）`;
+        }
+
         // 開啟待辦事項模態框
         function openTodoModal() {
             selectedDate = selectedDate || formatDate(currentDate);
@@ -1077,7 +1092,7 @@
             // 關閉日期詳細模態框
             document.getElementById('dayModal').style.display = 'none';
             // 顯示目前選取日期
-            document.getElementById('selectedDateDisplay').textContent = '日期：' + (selectedDate || formatDate(currentDate));
+            updateSelectedDateDisplay();
         }
 
         // 關閉待辦事項模態框
@@ -1155,7 +1170,7 @@
                 // 修正：編輯時自動關閉日期詳細視窗
                 document.getElementById('dayModal').style.display = 'none';
                 // 顯示目前選取日期
-                document.getElementById('selectedDateDisplay').textContent = '日期：' + (selectedDate || formatDate(currentDate));
+                updateSelectedDateDisplay();
             }
         }
 
@@ -1692,6 +1707,12 @@
             // 這裡放你的更新邏輯，例如：
             renderCalendar();
             // ...其他每日重置
+        });
+
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                renderCalendar();
+            }
         });
     </script>
 </body>
